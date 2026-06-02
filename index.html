@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa da Saúde - Unidades de Saúde do Brasil</title>
+
+    <!-- Leaflet CSS-->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+    <!-- Leaflet JS-->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- CSS Principal-->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!--Barra Lateral-->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>
+                    <span class="icon">🏥</span>
+                    Mapa da Saúde
+                </h1>
+            </div>
+
+        <!--Filtros-->
+        <div class="filters">
+            <div class="filter-group">
+                <label for="estado">Estado</label>
+                <select id="estado" class="filter-select">
+                    <option value="">Selecione um estado</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label for="cidade">Cidade</label>
+                <select id="cidade" class="filter-select" disabled>
+                    <option value="">Primeiro selecione um estado</option>
+                </select>
+            </div>
+        </div>
+
+        <!--Loading Indicator-->
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Carregando unidades de saúde...</p>
+        </div>
+
+        <!--Error Message-->
+        <div id="error-message" class="error-message" style="display: none;"></div>
+
+        <!--Cards Container-->
+        <div id="cards-container" class="cards-container">
+            <div class="empty-state">
+                <span class="empty-icon">📍</span>
+                <p>Selecione um estado e cidade<br>para visualizar as unidades de saúde</p>
+            </div>
+        </div>
+        </aside>
+
+        <!--Mapa-->
+        <main class="map-container">
+            <div id="map" class="map"></div>
+        </main>
+    </div>
+
+    <!--Script Principal-->
+    <script src="script.js"></script>
+</body>
+</html>
