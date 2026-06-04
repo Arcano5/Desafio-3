@@ -5,7 +5,7 @@
 
 // ==================== CONFIGURAÇÕES ====================
 const CONFIG = {
-    WEBHOOK_URL: 'https://seu-webhook-n8n.com/endpoint', // Altere para sua URL do n8n
+    WEBHOOK_URL: 'https://angryventures.app.n8n.cloud/webhook/consultar-estabelecimentos', // Altere para sua URL do n8n
     DEFAULT_ZOOM: 12,
     BRAZIL_CENTER: [-14.2350, -51.9253],
     BRAZIL_ZOOM: 4,
