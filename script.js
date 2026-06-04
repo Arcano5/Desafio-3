@@ -51,13 +51,13 @@ async function initMap() {
 // ==================== CARREGAMENTO DE DADOS LOCAIS ====================
 async function loadMunicipiosData() {
     try {
-        const response = await fetch('data/municipios.json');
-        if (!response.ok) throw new Error('Erro ao carregar dados de municípios');
+        const response = await fetch('https://angryventures.app.n8n.cloud/webhook/obter-opcoes');
+        if (!response.ok) throw new Error('Erro ao carregar municípios dinâmicos');
         citiesData = await response.json();
         populateEstados();
     } catch (error) {
         console.error('Erro:', error);
-        showError('Não foi possível carregar a lista de municípios');
+        showError('Não foi possível carregar a lista de municípios ativos');
     }
 }
 
