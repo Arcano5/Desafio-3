@@ -331,3 +331,90 @@ body {
         flex-direction: column;
     }
 }
+
+
+/* Context Message - Princípio de Krug */
+.context-message {
+    padding: 20px 20px 0 20px;
+}
+
+.context-message p {
+    background: #e7f3ff;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    color: #004085;
+    border-left: 4px solid #667eea;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Botão de Gatilho */
+.trigger-container {
+    padding: 16px 20px;
+}
+
+.btn-start {
+    width: 100%;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.btn-start:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(40, 167, 69, 0.4);
+}
+
+.btn-start:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.btn-start:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.btn-icon {
+    font-size: 18px;
+}
+
+/* Container dos Filtros */
+.filters-container {
+    transition: opacity 0.3s ease;
+}
+
+/* Ajustes no layout */
+.sidebar {
+    width: 380px;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    overflow: hidden;
+}
+
+/* Correção de responsividade */
+@media (max-width: 768px) {
+    .context-message p {
+        font-size: 12px;
+        padding: 10px 12px;
+    }
+    
+    .btn-start {
+        padding: 12px 16px;
+        font-size: 14px;
+    }
+}

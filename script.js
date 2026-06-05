@@ -1,6 +1,6 @@
 /**
  * Sistema de Mapeamento de Unidades de Saúde
- * Versão 1.0 - Performance Otimizada
+ * Versão 2.0 - Fluxo Guiado pelo Usuário
  */
 
 // ==================== CONFIGURAÇÕES ====================
@@ -28,13 +28,65 @@ let requestCache = new Map();
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         await initMap();
-        await loadMunicipiosData();
         setupEventListeners();
+        setupTriggerButton();
     } catch (error) {
         console.error('Erro na inicialização:', error);
         showError('Erro ao inicializar aplicação. Recarregue a página.');
     }
 });
+
+// ==================== SETUP DO BOTÃO DE GATILHO ====================
+function setupTriggerButton() {
+    const btnIniciar = document.getElementById('btn-iniciar');
+    const contextMessage = document.getElementById('context-message');
+    const filtersContainer = document.getElementById('filters-container');
+    const btnContainer = document.querySelector('.trigger-container');
+    
+    btnIniciar.addEventListener('click', async () => {
+        // Muda o texto do botão para indicar carregamento
+        const originalText = btnIniciar.innerHTML;
+        btnIniciar.innerHTML = '<span class="btn-icon">⏳</span> Consultando base de dados...';
+        btnIniciar.disabled = true;
+        
+        try {
+            // Carrega os municípios
+            await loadMunicipiosData();
+            
+            // Se chegou aqui, deu certo - esconde o texto e botão, mostra os filtros
+            if (citiesData && citiesData.length > 0) {
+                // Animação de fade out
+                contextMessage.style.transition = 'opacity 0.3s';
+                btnContainer.style.transition = 'opacity 0.3s';
+                contextMessage.style.opacity = '0';
+                btnContainer.style.opacity = '0';
+                
+                setTimeout(() => {
+                    contextMessage.style.display = 'none';
+                    btnContainer.style.display = 'none';
+                    filtersContainer.style.display = 'block';
+                    filtersContainer.style.opacity = '0';
+                    filtersContainer.style.transition = 'opacity 0.3s';
+                    
+                    setTimeout(() => {
+                        filtersContainer.style.opacity = '1';
+                    }, 10);
+                }, 300);
+                
+                showSuccess('Dados carregados com sucesso! Selecione um estado para começar.');
+            } else {
+                throw new Error('Nenhum dado recebido da base');
+            }
+        } catch (error) {
+            console.error('Erro ao carregar dados:', error);
+            showError('Erro ao carregar base de dados. Tente novamente mais tarde.');
+            
+            // Restaura o botão
+            btnIniciar.innerHTML = originalText;
+            btnIniciar.disabled = false;
+        }
+    });
+}
 
 // ==================== MAPA ====================
 async function initMap() {
@@ -55,9 +107,10 @@ async function loadMunicipiosData() {
         if (!response.ok) throw new Error('Erro ao carregar municípios dinâmicos');
         citiesData = await response.json();
         populateEstados();
+        return true;
     } catch (error) {
         console.error('Erro:', error);
-        showError('Não foi possível carregar a lista de municípios ativos');
+        throw new Error('Não foi possível carregar a lista de municípios ativos');
     }
 }
 
@@ -344,7 +397,7 @@ function clearUI() {
     document.getElementById('cards-container').innerHTML = `
         <div class="empty-state">
             <span class="empty-icon">📍</span>
-            <p>Selecione um estado e cidade<br>para visualizar as unidades de saúde</p>
+            <p>Selecione uma cidade<br>para visualizar as unidades de saúde</p>
         </div>
     `;
     document.getElementById('error-message').style.display = 'none';
@@ -370,6 +423,22 @@ function showError(message) {
     setTimeout(() => {
         errorElement.style.display = 'none';
     }, 5000);
+}
+
+function showSuccess(message) {
+    const errorElement = document.getElementById('error-message');
+    errorElement.style.backgroundColor = '#d4edda';
+    errorElement.style.borderColor = '#c3e6cb';
+    errorElement.style.color = '#155724';
+    errorElement.textContent = message;
+    errorElement.style.display = 'block';
+    
+    setTimeout(() => {
+        errorElement.style.display = 'none';
+        errorElement.style.backgroundColor = ''; // Reseta para o padrão
+        errorElement.style.borderColor = '';
+        errorElement.style.color = '';
+    }, 3000);
 }
 
 function debounce(func, wait) {

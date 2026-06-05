@@ -23,41 +23,52 @@
                     <span class="icon">🏥</span>
                     Mapa da Saúde
                 </h1>
+                <div class="subtitle">Encontre unidades de saúde próximas a você</div>
             </div>
 
-        <!--Filtros-->
-        <div class="filters">
-            <div class="filter-group">
-                <label for="estado">Estado</label>
-                <select id="estado" class="filter-select">
-                    <option value="">Selecione um estado</option>
-                </select>
+            <!--Botão de Gatilho-->
+            <div class="trigger-container">
+                <button id="btn-iniciar" class="btn-start">
+                    <span class="btn-icon">🚀</span>
+                    Carregar Dados do Sistema
+                </button>
             </div>
 
-            <div class="filter-group">
-                <label for="cidade">Cidade</label>
-                <select id="cidade" class="filter-select" disabled>
-                    <option value="">Primeiro selecione um estado</option>
-                </select>
+            <!--Filtros-->
+            <div id="filter-container" class="filters-container" style="display: none;"> 
+                <div class="filters">
+                    <div class="filter-group">
+                        <label for="estado">Estado</label>
+                        <select id="estado" class="filter-select">
+                            <option value="">Selecione um estado</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="cidade">Cidade</label>
+                        <select id="cidade" class="filter-select" disabled>
+                            <option value="">Primeiro selecione um estado</option>
+                        </select>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <!--Loading Indicator-->
-        <div id="loading" class="loading" style="display: none;">
-            <div class="spinner"></div>
-            <p>Carregando unidades de saúde...</p>
-        </div>
-
-        <!--Error Message-->
-        <div id="error-message" class="error-message" style="display: none;"></div>
-
-        <!--Cards Container-->
-        <div id="cards-container" class="cards-container">
-            <div class="empty-state">
-                <span class="empty-icon">📍</span>
-                <p>Selecione um estado e cidade<br>para visualizar as unidades de saúde</p>
+            <!--Loading Indicator-->
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Carregando unidades de saúde...</p>
             </div>
-        </div>
+
+            <!--Error Message-->
+            <div id="error-message" class="error-message" style="display: none;"></div>
+
+            <!--Cards Container-->
+            <div id="cards-container" class="cards-container">
+                <div class="empty-state">
+                    <span class="empty-icon">📍</span>
+                    <p>Clique em "Carregar Dados do Sistema<br>para começar a busca</p>
+                </div>
+            </div>
         </aside>
 
         <!--Mapa-->
