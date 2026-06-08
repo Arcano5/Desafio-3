@@ -5,7 +5,8 @@
 
 // ==================== CONFIGURAÇÕES ====================
 const CONFIG = {
-    WEBHOOK_URL: 'https://angryventures.app.n8n.cloud/webhook/consultar-estabelecimentos', // Altere para sua URL do n8n
+    WEBHOOK_MENU: 'https://angryventures.app.n8n.cloud/webhook/obter-opcoes',
+    WEBHOOK_UNIDADES: 'https://angryventures.app.n8n.cloud/webhook/unidades',
     DEFAULT_ZOOM: 12,
     BRAZIL_CENTER: [-14.2350, -51.9253],
     BRAZIL_ZOOM: 4,
@@ -56,13 +57,15 @@ function setupTriggerButton() {
             // Se chegou aqui, deu certo - esconde o texto e botão, mostra os filtros
             if (citiesData && citiesData.length > 0) {
                 // Animação de fade out
-                contextMessage.style.transition = 'opacity 0.3s';
+                if (contextMessage) {
+                    contextMessage.style.transition = 'opacity 0.3s';
+                    contextMessage.style.opacity = '0';
+                }
                 btnContainer.style.transition = 'opacity 0.3s';
-                contextMessage.style.opacity = '0';
                 btnContainer.style.opacity = '0';
                 
                 setTimeout(() => {
-                    contextMessage.style.display = 'none';
+                    if (contextMessage) contextMessage.style.display = 'none';
                     btnContainer.style.display = 'none';
                     filtersContainer.style.display = 'block';
                     filtersContainer.style.opacity = '0';
@@ -103,8 +106,15 @@ async function initMap() {
 // ==================== CARREGAMENTO DE DADOS LOCAIS ====================
 async function loadMunicipiosData() {
     try {
-        const response = await fetch('https://angryventures.app.n8n.cloud/webhook/obter-opcoes');
+        const response = await fetch(CONFIG.WEBHOOK_MENU, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
         if (!response.ok) throw new Error('Erro ao carregar municípios dinâmicos');
+        
         citiesData = await response.json();
         populateEstados();
         return true;
@@ -116,6 +126,8 @@ async function loadMunicipiosData() {
 
 function populateEstados() {
     const estadoSelect = document.getElementById('estado');
+    estadoSelect.innerHTML = '<option value="">Selecione um estado</option>';
+    
     const estados = [...new Set(citiesData.map(item => item.estado))].sort();
     
     estados.forEach(estado => {
@@ -162,8 +174,16 @@ async function fetchHealthUnits(estado, cidade) {
     errorElement.style.display = 'none';
     
     try {
-        const url = `${CONFIG.WEBHOOK_URL}?estado=${encodeURIComponent(estado)}&cidade=${encodeURIComponent(cidade)}`;
-        const response = await fetch(url);
+        const response = await fetch(CONFIG.WEBHOOK_UNIDADES, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                estado_solicitado: estado,
+                cidade_solicitada: cidade
+            })
+        });
         
         if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         
@@ -435,7 +455,7 @@ function showSuccess(message) {
     
     setTimeout(() => {
         errorElement.style.display = 'none';
-        errorElement.style.backgroundColor = ''; // Reseta para o padrão
+        errorElement.style.backgroundColor = '';
         errorElement.style.borderColor = '';
         errorElement.style.color = '';
     }, 3000);
