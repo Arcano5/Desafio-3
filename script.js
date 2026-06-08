@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 function setupTriggerButton() {
     const btnIniciar = document.getElementById('btn-iniciar');
     const contextMessage = document.getElementById('context-message');
-    const filtersContainer = document.getElementById('filters-container');
+    const filterContainer = document.getElementById('filter-container');
     const btnContainer = document.querySelector('.trigger-container');
     
     btnIniciar.addEventListener('click', async () => {
@@ -67,12 +67,12 @@ function setupTriggerButton() {
                 setTimeout(() => {
                     if (contextMessage) contextMessage.style.display = 'none';
                     btnContainer.style.display = 'none';
-                    filtersContainer.style.display = 'block';
-                    filtersContainer.style.opacity = '0';
-                    filtersContainer.style.transition = 'opacity 0.3s';
+                    filterContainer.style.display = 'block';
+                    filterContainer.style.opacity = '0';
+                    filterContainer.style.transition = 'opacity 0.3s';
                     
                     setTimeout(() => {
-                        filtersContainer.style.opacity = '1';
+                        filterContainer.style.opacity = '1';
                     }, 10);
                 }, 300);
                 
@@ -128,21 +128,30 @@ function populateEstados() {
     const estadoSelect = document.getElementById('estado');
     estadoSelect.innerHTML = '<option value="">Selecione um estado</option>';
     
-    const estados = [...new Set(citiesData.map(item => item.estado))].sort();
+    // Extrai os estados únicos usando a propriedade 'nome' do item
+    const estados = [...new Set(citiesData.map(item => item.nome?.estado || item.estado))].sort();
     
     estados.forEach(estado => {
-        const option = document.createElement('option');
-        option.value = estado;
-        option.textContent = estado;
-        estadoSelect.appendChild(option);
+        if (estado) {
+            const option = document.createElement('option');
+            option.value = estado;
+            option.textContent = estado;
+            estadoSelect.appendChild(option);
+        }
     });
 }
 
 function populateCidades(estado) {
     const cidadeSelect = document.getElementById('cidade');
+    
+    // Filtra as cidades pelo estado usando a propriedade 'nome'
     const cidades = citiesData
-        .filter(item => item.estado === estado)
-        .map(item => item.cidade)
+        .filter(item => {
+            const itemEstado = item.nome?.estado || item.estado;
+            return itemEstado === estado;
+        })
+        .map(item => item.nome?.cidade || item.cidade)
+        .filter(cidade => cidade) // Remove valores undefined/null
         .sort();
     
     cidadeSelect.innerHTML = '<option value="">Selecione uma cidade</option>';
