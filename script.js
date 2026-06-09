@@ -1,13 +1,13 @@
 /**
  * Sistema de Mapeamento de Unidades de Saúde
- * Versão 2.2 - Com clique no card funcionando perfeitamente
+ * Versão 2.3 - Com marcadores customizados e UX melhorada
  */
 
 // ==================== CONFIGURAÇÕES ====================
 const CONFIG = {
     WEBHOOK_MENU: 'https://angryventures.app.n8n.cloud/webhook/obter-opcoes',
     WEBHOOK_UNIDADES: 'https://angryventures.app.n8n.cloud/webhook/unidades',
-    DEFAULT_ZOOM: 16, // 🔧 AUMENTADO: Zoom mais próximo para melhor visualização
+    DEFAULT_ZOOM: 14,
     BRAZIL_CENTER: [-14.2350, -51.9253],
     BRAZIL_ZOOM: 4,
     CACHE_DURATION: 3600000,
@@ -35,6 +35,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         await initMap();
         setupEventListeners();
         setupTriggerButton();
+        
+        // 🔧 Garante que o mapa mostre o Brasil corretamente
+        setTimeout(() => {
+            if (map) {
+                map.setView(CONFIG.BRAZIL_CENTER, CONFIG.BRAZIL_ZOOM);
+                console.log('Mapa centralizado no Brasil');
+            }
+        }, 100);
     } catch (error) {
         console.error('Erro na inicialização:', error);
         showError('Erro ao inicializar aplicação. Recarregue a página.');
@@ -114,6 +122,7 @@ async function initMap() {
     }
     
     try {
+        // 🔧 CORREÇÃO: Centraliza no Brasil desde o início
         map = L.map('map').setView(CONFIG.BRAZIL_CENTER, CONFIG.BRAZIL_ZOOM);
         
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -124,7 +133,7 @@ async function initMap() {
         }).addTo(map);
         
         mapInitialized = true;
-        console.log('Mapa inicializado com sucesso');
+        console.log('Mapa inicializado com sucesso - Brasil centralizado');
     } catch (error) {
         console.error('Erro ao inicializar mapa:', error);
         throw error;
@@ -297,6 +306,25 @@ function clearMapMarkers() {
     if (window.gc) window.gc();
 }
 
+// 🔧 NOVA FUNÇÃO: Cria ícone customizado colorido
+function createCustomIcon(isActive = false) {
+    return L.divIcon({
+        className: `custom-marker ${isActive ? 'custom-marker-active' : ''}`,
+        html: `<div style="
+            background: ${isActive ? '#e74c3c' : '#667eea'};
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            transition: all 0.2s;
+        "></div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
+        popupAnchor: [0, -10]
+    });
+}
+
 function addMarkersToMap(units) {
     if (!map) {
         console.error('Mapa não inicializado');
@@ -320,24 +348,36 @@ function addMarkersToMap(units) {
         }
         
         if (isNaN(lat) || isNaN(lng)) {
-            console.warn(`Coordenadas inválidas para unidade: ${unit.nome || 'sem nome'}`, lat, lng);
+            console.warn(`Coordenadas inválidas para unidade: ${unit.nome || 'sem nome'}`);
             return;
         }
         
         try {
-            const marker = L.marker([lat, lng]).addTo(map);
+            // 🔧 USA ÍCONE CUSTOMIZADO COLORIDO
+            const marker = L.marker([lat, lng], {
+                icon: createCustomIcon(false)
+            }).addTo(map);
             
             const popupContent = createPopupContent(unit);
             marker.bindPopup(popupContent, { className: 'custom-popup' });
             
             const markerIndex = markers.length;
             
-            // 🔧 MELHORIA: Clique no marcador também foca no card
             marker.on('click', () => {
                 console.log(`Marcador ${markerIndex} clicado`);
                 highlightCard(markerIndex);
                 scrollToCard(markerIndex);
                 marker.openPopup();
+                
+                // Muda a cor do marcador ativo
+                marker.setIcon(createCustomIcon(true));
+                
+                // Reseta os outros marcadores
+                markers.forEach((m, i) => {
+                    if (i !== markerIndex && m.setIcon) {
+                        m.setIcon(createCustomIcon(false));
+                    }
+                });
             });
             
             markers.push(marker);
@@ -367,7 +407,7 @@ function createPopupContent(unit) {
     
     return `
         <div class="custom-popup">
-            <div class="popup-title">${escapeHtml(nome)}</div>
+            <div class="popup-title">🏥 ${escapeHtml(nome)}</div>
             <div class="popup-info">📞 ${escapeHtml(telefone)}</div>
             <div class="popup-info">🕒 ${escapeHtml(horario)}</div>
             <div class="popup-info">📍 ${escapeHtml(endereco)}</div>
@@ -453,13 +493,11 @@ function createCardElement(unit, index) {
         </div>
     `;
     
-    // 🔧 MELHORIA: Evento de clique no card com feedback visual
     const clickHandler = (e) => {
         if (e.target.closest('.directions-link')) return;
         
         console.log(`Card ${index} clicado: ${nome}`);
         
-        // Feedback visual imediato
         div.style.transform = 'scale(0.98)';
         setTimeout(() => {
             div.style.transform = '';
@@ -469,20 +507,15 @@ function createCardElement(unit, index) {
     };
     
     div.addEventListener('click', clickHandler);
-    
-    // Armazena o handler para remoção futura se necessário
     div.clickHandler = clickHandler;
     
     return div;
 }
 
-// 🔧 FUNÇÃO PRINCIPAL: Foca no marcador quando o card é clicado
 function focusOnMarker(index) {
-    // Verifica se o marcador existe
     if (!markers[index]) {
         console.error(`Marcador ${index} não encontrado`);
         
-        // Tenta encontrar o marcador pelas coordenadas salvas no card
         const card = currentCards[index];
         if (card) {
             const lat = card.getAttribute('data-lat');
@@ -501,19 +534,21 @@ function focusOnMarker(index) {
         
         console.log(`Focando no marcador ${index}: ${latlng.lat}, ${latlng.lng}`);
         
-        // 🔧 ZOOM IN com animação suave
         map.setView(latlng, CONFIG.DEFAULT_ZOOM, {
             animate: true,
             duration: 0.5
         });
         
-        // Abre o popup do marcador
         marker.openPopup();
         
-        // Destaca o card correspondente
-        highlightCard(index);
+        // Muda a cor do marcador ativo
+        markers.forEach((m, i) => {
+            if (m.setIcon) {
+                m.setIcon(createCustomIcon(i === index));
+            }
+        });
         
-        // Scroll até o card
+        highlightCard(index);
         scrollToCard(index);
         
     } catch (error) {
@@ -535,7 +570,7 @@ function scrollToCard(index) {
     if (card) {
         card.scrollIntoView({ 
             behavior: 'smooth', 
-            block: 'center'  // 🔧 Centraliza o card na visualização
+            block: 'center'
         });
     }
 }
@@ -621,8 +656,10 @@ function clearUI() {
     const errorElement = document.getElementById('error-message');
     if (errorElement) errorElement.style.display = 'none';
     
+    // 🔧 VOLTA PARA A VISÃO DO BRASIL
     if (map && mapInitialized && CONFIG.BRAZIL_CENTER) {
         map.setView(CONFIG.BRAZIL_CENTER, CONFIG.BRAZIL_ZOOM);
+        console.log('Voltando para visão do Brasil');
     }
 }
 
@@ -693,6 +730,9 @@ if (typeof window !== 'undefined') {
             if (window.gc) window.gc();
             console.log('Forçando coleta de lixo');
         },
-        focusMarker: (index) => focusOnMarker(index) // 🔧 Função de debug
+        focusMarker: (index) => focusOnMarker(index),
+        resetView: () => {
+            if (map) map.setView(CONFIG.BRAZIL_CENTER, CONFIG.BRAZIL_ZOOM);
+        }
     };
 }

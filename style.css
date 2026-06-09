@@ -28,14 +28,14 @@ body {
     box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1);
     z-index: 10;
     overflow: hidden;
-    flex-shrink: 0; /* 🔧 Impede a sidebar de encolher */
+    flex-shrink: 0;
 }
 
 .sidebar-header {
     padding: 24px 20px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    flex-shrink: 0; /* 🔧 Header não encolhe */
+    flex-shrink: 0;
 }
 
 .sidebar-header h1{
@@ -150,10 +150,9 @@ body {
     overflow-y: auto;
     overflow-x: hidden;
     padding: 16px;
-    min-height: 0; /* 🔧 CRÍTICO: Permite scroll no flex */
+    min-height: 0;
 }
 
-/* 🔧 Melhora a experiência de scroll */
 .cards-container::-webkit-scrollbar {
     width: 8px;
 }
@@ -172,7 +171,6 @@ body {
     background: #555;
 }
 
-/* Firefox scroll */
 .cards-container {
     scrollbar-width: thin;
     scrollbar-color: #888 #f1f1f1;
@@ -297,17 +295,40 @@ body {
     background: #218838;
 }
 
-/* Map Container - 🔧 CORREÇÃO: Garante que o mapa ocupe o espaço restante */
+/* Map Container */
 .map-container {
     flex: 1;
     position: relative;
-    min-width: 0; /* 🔧 CRÍTICO: Permite que o flex container encolha corretamente */
+    min-width: 0;
 }
 
 .map {
     width: 100%;
     height: 100%;
-    background: #e8e8e8; /* 🔧 Cor de fallback enquanto o mapa carrega */
+    background: #e8e8e8;
+}
+
+/* 🔧 NOVO: Estilos para marcadores personalizados */
+.custom-marker {
+    background: #667eea;
+    border: 3px solid white;
+    border-radius: 50%;
+    width: 20px !important;
+    height: 20px !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.custom-marker:hover {
+    transform: scale(1.2);
+    background: #764ba2;
+}
+
+.custom-marker-active {
+    background: #e74c3c;
+    transform: scale(1.3);
+    box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
 }
 
 /* Leaflet Popup Customization */
@@ -435,13 +456,12 @@ body {
     }
 }
 
-/* 🔧 Garantia de que o mapa seja renderizado em qualquer situação */
+/* Garantia do mapa */
 .leaflet-container {
     background: #e8e8e8;
     z-index: 1;
 }
 
-/* 🔧 Força o mapa a ter altura quando o container pai tem height definida */
 .map-container,
 #map {
     position: relative;
