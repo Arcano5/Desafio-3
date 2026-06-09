@@ -1,19 +1,24 @@
 /**
  * Sistema de Mapeamento de Unidades de Saúde
- * Versão 2.3 - Com marcadores customizados e UX melhorada
+ * Versão 2.4 - Com OpenStreetMap e validação de coordenadas
  */
 
 // ==================== CONFIGURAÇÕES ====================
 const CONFIG = {
     WEBHOOK_MENU: 'https://angryventures.app.n8n.cloud/webhook/obter-opcoes',
     WEBHOOK_UNIDADES: 'https://angryventures.app.n8n.cloud/webhook/unidades',
-    DEFAULT_ZOOM: 14,
+    DEFAULT_ZOOM: 15,
     BRAZIL_CENTER: [-14.2350, -51.9253],
     BRAZIL_ZOOM: 4,
     CACHE_DURATION: 3600000,
     DEBOUNCE_DELAY: 300,
     MAX_MARKERS: 1000,
-    MAX_CACHE_SIZE: 50
+    MAX_CACHE_SIZE: 50,
+    // 🔧 CORREÇÃO: Limites geográficos do Brasil para validar coordenadas
+    BRAZIL_LAT_MIN: -33.5,
+    BRAZIL_LAT_MAX: 5.5,
+    BRAZIL_LNG_MIN: -73.5,
+    BRAZIL_LNG_MAX: -34.5
 };
 
 // ==================== ESTADO GLOBAL ====================
@@ -36,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setupEventListeners();
         setupTriggerButton();
         
-        // 🔧 Garante que o mapa mostre o Brasil corretamente
+        // Garante que o mapa mostre o Brasil corretamente
         setTimeout(() => {
             if (map) {
                 map.setView(CONFIG.BRAZIL_CENTER, CONFIG.BRAZIL_ZOOM);
@@ -122,18 +127,17 @@ async function initMap() {
     }
     
     try {
-        // 🔧 CORREÇÃO: Centraliza no Brasil desde o início
         map = L.map('map').setView(CONFIG.BRAZIL_CENTER, CONFIG.BRAZIL_ZOOM);
         
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CartoDB',
-            subdomains: 'abcd',
+        // 🔧 SUBSTITUÍDO: OpenStreetMap (sem CORS, mais confiável)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             maxZoom: 19,
             minZoom: 3
         }).addTo(map);
         
         mapInitialized = true;
-        console.log('Mapa inicializado com sucesso - Brasil centralizado');
+        console.log('Mapa inicializado com OpenStreetMap - Brasil centralizado');
     } catch (error) {
         console.error('Erro ao inicializar mapa:', error);
         throw error;
@@ -266,6 +270,23 @@ async function fetchHealthUnits(estado, cidade) {
             units = [];
         }
         
+        // 🔧 CORREÇÃO: Valida e corrige coordenadas inválidas
+        units = units.filter(unit => {
+            let lat = parseFloat(unit.latitude || unit.lat || unit.Latitude || unit.LAT);
+            let lng = parseFloat(unit.longitude || unit.lng || unit.Longitude || unit.LON || unit.LNG);
+            
+            // Verifica se a coordenada está dentro do Brasil
+            const isValid = !isNaN(lat) && !isNaN(lng) &&
+                           lat >= CONFIG.BRAZIL_LAT_MIN && lat <= CONFIG.BRAZIL_LAT_MAX &&
+                           lng >= CONFIG.BRAZIL_LNG_MIN && lng <= CONFIG.BRAZIL_LNG_MAX;
+            
+            if (!isValid) {
+                console.warn(`Coordenada inválida para ${unit.nome || 'unidade'}: lat=${lat}, lng=${lng}`);
+            }
+            
+            return isValid;
+        });
+        
         if (requestCache.size >= CONFIG.MAX_CACHE_SIZE) {
             const firstKey = requestCache.keys().next().value;
             requestCache.delete(firstKey);
@@ -276,7 +297,7 @@ async function fetchHealthUnits(estado, cidade) {
             timestamp: Date.now()
         });
         
-        console.log(`Carregadas ${units.length} unidades para ${cidade}/${estado}`);
+        console.log(`Carregadas ${units.length} unidades válidas para ${cidade}/${estado}`);
         return units;
     } catch (error) {
         console.error('Erro no fetch:', error);
@@ -306,7 +327,7 @@ function clearMapMarkers() {
     if (window.gc) window.gc();
 }
 
-// 🔧 NOVA FUNÇÃO: Cria ícone customizado colorido
+// 🔧 ÍCONE CUSTOMIZADO COLORIDO
 function createCustomIcon(isActive = false) {
     return L.divIcon({
         className: `custom-marker ${isActive ? 'custom-marker-active' : ''}`,
@@ -331,6 +352,12 @@ function addMarkersToMap(units) {
         return;
     }
     
+    if (!units || units.length === 0) {
+        console.warn('Nenhuma unidade com coordenadas válidas para adicionar ao mapa');
+        showError('Nenhuma coordenada válida encontrada para exibir no mapa');
+        return;
+    }
+    
     const unitsToProcess = units.slice(0, CONFIG.MAX_MARKERS);
     const bounds = [];
     
@@ -347,13 +374,15 @@ function addMarkersToMap(units) {
             return;
         }
         
-        if (isNaN(lat) || isNaN(lng)) {
-            console.warn(`Coordenadas inválidas para unidade: ${unit.nome || 'sem nome'}`);
+        // Validação extra antes de adicionar
+        if (isNaN(lat) || isNaN(lng) ||
+            lat < CONFIG.BRAZIL_LAT_MIN || lat > CONFIG.BRAZIL_LAT_MAX ||
+            lng < CONFIG.BRAZIL_LNG_MIN || lng > CONFIG.BRAZIL_LNG_MAX) {
+            console.warn(`Coordenada fora do Brasil para: ${unit.nome || 'unidade'}`, lat, lng);
             return;
         }
         
         try {
-            // 🔧 USA ÍCONE CUSTOMIZADO COLORIDO
             const marker = L.marker([lat, lng], {
                 icon: createCustomIcon(false)
             }).addTo(map);
@@ -369,10 +398,8 @@ function addMarkersToMap(units) {
                 scrollToCard(markerIndex);
                 marker.openPopup();
                 
-                // Muda a cor do marcador ativo
                 marker.setIcon(createCustomIcon(true));
                 
-                // Reseta os outros marcadores
                 markers.forEach((m, i) => {
                     if (i !== markerIndex && m.setIcon) {
                         m.setIcon(createCustomIcon(false));
@@ -396,6 +423,8 @@ function addMarkersToMap(units) {
             console.warn('Erro ao ajustar bounds do mapa:', error);
             map.setView(CONFIG.BRAZIL_CENTER, CONFIG.BRAZIL_ZOOM);
         }
+    } else {
+        console.warn('Nenhum bound válido para ajustar o mapa');
     }
 }
 
@@ -404,6 +433,8 @@ function createPopupContent(unit) {
     const telefone = unit.telefone || unit.phone || unit.TELEFONE || 'Não informado';
     const horario = unit.horario || unit.hours || unit.HORARIO || 'Não informado';
     const endereco = unit.endereco || unit.address || unit.ENDERECO || 'Não informado';
+    const lat = unit.latitude || unit.lat || '';
+    const lng = unit.longitude || unit.lng || '';
     
     return `
         <div class="custom-popup">
@@ -411,7 +442,7 @@ function createPopupContent(unit) {
             <div class="popup-info">📞 ${escapeHtml(telefone)}</div>
             <div class="popup-info">🕒 ${escapeHtml(horario)}</div>
             <div class="popup-info">📍 ${escapeHtml(endereco)}</div>
-            <a href="https://www.google.com/maps/search/?api=1&query=${unit.latitude || unit.lat},${unit.longitude || unit.lng}" 
+            <a href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}" 
                target="_blank" 
                class="popup-directions">
                 🚗 Como Chegar
@@ -435,7 +466,8 @@ function renderCards(units) {
         emptyDiv.className = 'empty-state';
         emptyDiv.innerHTML = `
             <span class="empty-icon">🏥</span>
-            <p>Nenhuma unidade de saúde encontrada<br>nesta cidade</p>
+            <p>Nenhuma unidade de saúde com coordenadas válidas<br>encontrada nesta cidade</p>
+            <small style="display: block; margin-top: 8px;">⚠️ Verifique se os dados do webhook contêm latitude/longitude corretas</small>
         `;
         fragment.appendChild(emptyDiv);
     } else {
@@ -541,7 +573,6 @@ function focusOnMarker(index) {
         
         marker.openPopup();
         
-        // Muda a cor do marcador ativo
         markers.forEach((m, i) => {
             if (m.setIcon) {
                 m.setIcon(createCustomIcon(i === index));
@@ -631,7 +662,7 @@ async function loadAndDisplayData(estado, cidade) {
                 addMarkersToMap(units);
             }, 50);
         } else {
-            showError('Nenhuma unidade encontrada para esta cidade');
+            showError('Nenhuma unidade com coordenadas válidas encontrada para esta cidade');
         }
     } catch (error) {
         console.error('Erro ao carregar dados:', error);
@@ -656,7 +687,6 @@ function clearUI() {
     const errorElement = document.getElementById('error-message');
     if (errorElement) errorElement.style.display = 'none';
     
-    // 🔧 VOLTA PARA A VISÃO DO BRASIL
     if (map && mapInitialized && CONFIG.BRAZIL_CENTER) {
         map.setView(CONFIG.BRAZIL_CENTER, CONFIG.BRAZIL_ZOOM);
         console.log('Voltando para visão do Brasil');
@@ -733,6 +763,7 @@ if (typeof window !== 'undefined') {
         focusMarker: (index) => focusOnMarker(index),
         resetView: () => {
             if (map) map.setView(CONFIG.BRAZIL_CENTER, CONFIG.BRAZIL_ZOOM);
-        }
+        },
+        getBounds: () => CONFIG
     };
 }
