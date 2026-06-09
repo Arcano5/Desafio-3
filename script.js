@@ -1,19 +1,19 @@
 /**
  * Sistema de Mapeamento de Unidades de Saúde
- * Versão 2.1 - Com proteções contra Memory Leak
+ * Versão 2.2 - Com clique no card funcionando perfeitamente
  */
 
 // ==================== CONFIGURAÇÕES ====================
 const CONFIG = {
     WEBHOOK_MENU: 'https://angryventures.app.n8n.cloud/webhook/obter-opcoes',
     WEBHOOK_UNIDADES: 'https://angryventures.app.n8n.cloud/webhook/unidades',
-    DEFAULT_ZOOM: 12,
+    DEFAULT_ZOOM: 16, // 🔧 AUMENTADO: Zoom mais próximo para melhor visualização
     BRAZIL_CENTER: [-14.2350, -51.9253],
     BRAZIL_ZOOM: 4,
     CACHE_DURATION: 3600000,
     DEBOUNCE_DELAY: 300,
-    MAX_MARKERS: 1000, // Proteção: limite máximo de marcadores
-    MAX_CACHE_SIZE: 50 // Proteção: limite de itens em cache
+    MAX_MARKERS: 1000,
+    MAX_CACHE_SIZE: 50
 };
 
 // ==================== ESTADO GLOBAL ====================
@@ -26,8 +26,8 @@ let currentState = '';
 let activeCardIndex = null;
 let citiesData = null;
 let requestCache = new Map();
-let isLoading = false; // 🔧 NOVO: Evita requisições concorrentes
-let mapInitialized = false; // 🔧 NOVO: Controla inicialização do mapa
+let isLoading = false;
+let mapInitialized = false;
 
 // ==================== INICIALIZAÇÃO ====================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -48,14 +48,12 @@ function setupTriggerButton() {
     const filterContainer = document.getElementById('filter-container');
     const btnContainer = document.querySelector('.trigger-container');
     
-    // 🔧 CORREÇÃO: Verifica se o botão existe antes de adicionar evento
     if (!btnIniciar) {
         console.error('Botão btn-iniciar não encontrado');
         return;
     }
     
     btnIniciar.addEventListener('click', async () => {
-        // 🔧 PROTEÇÃO: Evita múltiplos cliques simultâneos
         if (btnIniciar.disabled) return;
         
         const originalText = btnIniciar.innerHTML;
@@ -66,7 +64,6 @@ function setupTriggerButton() {
             await loadMunicipiosData();
             
             if (citiesData && citiesData.length > 0) {
-                // Animação de fade out
                 if (contextMessage) {
                     contextMessage.style.transition = 'opacity 0.3s';
                     contextMessage.style.opacity = '0';
@@ -105,7 +102,6 @@ function setupTriggerButton() {
 
 // ==================== MAPA ====================
 async function initMap() {
-    // 🔧 CORREÇÃO: Evita reinicialização do mapa
     if (mapInitialized && map) {
         console.log('Mapa já inicializado');
         return;
@@ -128,6 +124,7 @@ async function initMap() {
         }).addTo(map);
         
         mapInitialized = true;
+        console.log('Mapa inicializado com sucesso');
     } catch (error) {
         console.error('Erro ao inicializar mapa:', error);
         throw error;
@@ -148,12 +145,10 @@ async function loadMunicipiosData() {
         
         const data = await response.json();
         
-        // 🔧 CORREÇÃO: Validação robusta do formato dos dados
         if (!data || typeof data !== 'object') {
             throw new Error('Formato de dados inválido');
         }
         
-        // 🔧 CORREÇÃO: Garante que citiesData seja sempre um array
         citiesData = Array.isArray(data) ? data : (data.data ? (Array.isArray(data.data) ? data.data : []) : []);
         
         if (!Array.isArray(citiesData) || citiesData.length === 0) {
@@ -174,7 +169,6 @@ function populateEstados() {
     
     estadoSelect.innerHTML = '<option value="">Selecione um estado</option>';
     
-    // 🔧 CORREÇÃO: Extração segura dos estados
     const estados = [...new Set(citiesData.map(item => {
         return item.nome?.estado || item.estado || item.state || '';
     }))].filter(estado => estado && estado.trim() !== '').sort();
@@ -191,7 +185,6 @@ function populateCidades(estado) {
     const cidadeSelect = document.getElementById('cidade');
     if (!cidadeSelect) return;
     
-    // 🔧 CORREÇÃO: Filtragem segura das cidades
     const cidades = citiesData
         .filter(item => {
             const itemEstado = item.nome?.estado || item.estado || item.state || '';
@@ -215,7 +208,6 @@ function populateCidades(estado) {
 
 // ==================== WEBHOOK ====================
 async function fetchHealthUnits(estado, cidade) {
-    // 🔧 PROTEÇÃO: Evita requisições concorrentes
     if (isLoading) {
         console.log('Requisição em andamento, aguarde...');
         return [];
@@ -253,7 +245,6 @@ async function fetchHealthUnits(estado, cidade) {
         
         const data = await response.json();
         
-        // 🔧 CORREÇÃO: Validação e normalização dos dados
         let units = [];
         if (Array.isArray(data)) {
             units = data;
@@ -266,7 +257,6 @@ async function fetchHealthUnits(estado, cidade) {
             units = [];
         }
         
-        // 🔧 PROTEÇÃO: Limita o tamanho do cache
         if (requestCache.size >= CONFIG.MAX_CACHE_SIZE) {
             const firstKey = requestCache.keys().next().value;
             requestCache.delete(firstKey);
@@ -277,6 +267,7 @@ async function fetchHealthUnits(estado, cidade) {
             timestamp: Date.now()
         });
         
+        console.log(`Carregadas ${units.length} unidades para ${cidade}/${estado}`);
         return units;
     } catch (error) {
         console.error('Erro no fetch:', error);
@@ -290,7 +281,6 @@ async function fetchHealthUnits(estado, cidade) {
 
 // ==================== RENDERIZAÇÃO (OTIMIZADA) ====================
 function clearMapMarkers() {
-    // 🔧 CORREÇÃO: Limpeza segura dos marcadores
     if (!map) return;
     
     markers.forEach(marker => {
@@ -304,23 +294,21 @@ function clearMapMarkers() {
     });
     markers = [];
     
-    // 🔧 MELHORIA: Força garbage collection da memória (sugestão)
     if (window.gc) window.gc();
 }
 
 function addMarkersToMap(units) {
-    // 🔧 PROTEÇÃO: Verifica se o mapa existe
     if (!map) {
         console.error('Mapa não inicializado');
         return;
     }
     
-    // 🔧 PROTEÇÃO: Limita o número de marcadores
     const unitsToProcess = units.slice(0, CONFIG.MAX_MARKERS);
     const bounds = [];
     
+    console.log(`Adicionando ${unitsToProcess.length} marcadores ao mapa`);
+    
     unitsToProcess.forEach((unit, index) => {
-        // 🔧 CORREÇÃO: Validação rigorosa das coordenadas
         let lat, lng;
         
         try {
@@ -331,8 +319,8 @@ function addMarkersToMap(units) {
             return;
         }
         
-        if (isNaN(lat) || isNaN(lng) || lat < -33 || lat > 5 || lng < -73 || lng > -34) {
-            console.warn('Coordenadas inválidas para unidade:', unit.nome, lat, lng);
+        if (isNaN(lat) || isNaN(lng)) {
+            console.warn(`Coordenadas inválidas para unidade: ${unit.nome || 'sem nome'}`, lat, lng);
             return;
         }
         
@@ -342,11 +330,13 @@ function addMarkersToMap(units) {
             const popupContent = createPopupContent(unit);
             marker.bindPopup(popupContent, { className: 'custom-popup' });
             
-            // 🔧 CORREÇÃO: Evita closure com referência circular
             const markerIndex = markers.length;
+            
+            // 🔧 MELHORIA: Clique no marcador também foca no card
             marker.on('click', () => {
-                scrollToCard(markerIndex);
+                console.log(`Marcador ${markerIndex} clicado`);
                 highlightCard(markerIndex);
+                scrollToCard(markerIndex);
                 marker.openPopup();
             });
             
@@ -357,11 +347,11 @@ function addMarkersToMap(units) {
         }
     });
     
-    // 🔧 CORREÇÃO: Ajusta o zoom apenas se houver bounds válidos
     if (bounds.length > 0) {
         try {
             const boundsObj = L.latLngBounds(bounds);
             map.fitBounds(boundsObj, { padding: [50, 50] });
+            console.log(`Mapa ajustado para ${bounds.length} pontos`);
         } catch (error) {
             console.warn('Erro ao ajustar bounds do mapa:', error);
             map.setView(CONFIG.BRAZIL_CENTER, CONFIG.BRAZIL_ZOOM);
@@ -370,7 +360,6 @@ function addMarkersToMap(units) {
 }
 
 function createPopupContent(unit) {
-    // 🔧 CORREÇÃO: Acesso seguro às propriedades
     const nome = unit.nome || unit.name || unit.NOME || 'Unidade de Saúde';
     const telefone = unit.telefone || unit.phone || unit.TELEFONE || 'Não informado';
     const horario = unit.horario || unit.hours || unit.HORARIO || 'Não informado';
@@ -395,7 +384,6 @@ function renderCards(units) {
     const container = document.getElementById('cards-container');
     if (!container) return;
     
-    // 🔧 CORREÇÃO: Limpa o container de forma segura
     while (container.firstChild) {
         container.removeChild(container.firstChild);
     }
@@ -419,14 +407,16 @@ function renderCards(units) {
     
     container.appendChild(fragment);
     currentCards = document.querySelectorAll('.health-card');
+    console.log(`${currentCards.length} cards renderizados`);
 }
 
 function createCardElement(unit, index) {
     const div = document.createElement('div');
     div.className = 'health-card';
     div.setAttribute('data-index', index);
+    div.setAttribute('data-lat', unit.latitude || unit.lat || '');
+    div.setAttribute('data-lng', unit.longitude || unit.lng || '');
     
-    // 🔧 CORREÇÃO: Acesso seguro às propriedades
     const nome = unit.nome || unit.name || unit.NOME || 'Unidade de Saúde';
     const telefone = unit.telefone || unit.phone || unit.TELEFONE || 'Telefone não informado';
     const horario = unit.horario || unit.hours || unit.HORARIO || 'Horário não informado';
@@ -463,28 +453,69 @@ function createCardElement(unit, index) {
         </div>
     `;
     
-    // 🔧 CORREÇÃO: Evita múltiplos event listeners
-    div.removeEventListener('click', div.clickHandler);
-    div.clickHandler = (e) => {
+    // 🔧 MELHORIA: Evento de clique no card com feedback visual
+    const clickHandler = (e) => {
         if (e.target.closest('.directions-link')) return;
+        
+        console.log(`Card ${index} clicado: ${nome}`);
+        
+        // Feedback visual imediato
+        div.style.transform = 'scale(0.98)';
+        setTimeout(() => {
+            div.style.transform = '';
+        }, 150);
+        
         focusOnMarker(index);
     };
-    div.addEventListener('click', div.clickHandler);
+    
+    div.addEventListener('click', clickHandler);
+    
+    // Armazena o handler para remoção futura se necessário
+    div.clickHandler = clickHandler;
     
     return div;
 }
 
+// 🔧 FUNÇÃO PRINCIPAL: Foca no marcador quando o card é clicado
 function focusOnMarker(index) {
-    if (!markers[index]) return;
+    // Verifica se o marcador existe
+    if (!markers[index]) {
+        console.error(`Marcador ${index} não encontrado`);
+        
+        // Tenta encontrar o marcador pelas coordenadas salvas no card
+        const card = currentCards[index];
+        if (card) {
+            const lat = card.getAttribute('data-lat');
+            const lng = card.getAttribute('data-lng');
+            if (lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng))) {
+                console.log(`Tentando focar por coordenadas: ${lat}, ${lng}`);
+                map.setView([parseFloat(lat), parseFloat(lng)], CONFIG.DEFAULT_ZOOM);
+            }
+        }
+        return;
+    }
     
     try {
         const marker = markers[index];
         const latlng = marker.getLatLng();
         
-        map.setView(latlng, CONFIG.DEFAULT_ZOOM);
+        console.log(`Focando no marcador ${index}: ${latlng.lat}, ${latlng.lng}`);
+        
+        // 🔧 ZOOM IN com animação suave
+        map.setView(latlng, CONFIG.DEFAULT_ZOOM, {
+            animate: true,
+            duration: 0.5
+        });
+        
+        // Abre o popup do marcador
         marker.openPopup();
+        
+        // Destaca o card correspondente
         highlightCard(index);
+        
+        // Scroll até o card
         scrollToCard(index);
+        
     } catch (error) {
         console.error('Erro ao focar no marcador:', error);
     }
@@ -495,13 +526,17 @@ function highlightCard(index) {
     if (currentCards[index]) {
         currentCards[index].classList.add('active');
         activeCardIndex = index;
+        console.log(`Card ${index} destacado`);
     }
 }
 
 function scrollToCard(index) {
     const card = currentCards[index];
     if (card) {
-        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        card.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center'  // 🔧 Centraliza o card na visualização
+        });
     }
 }
 
@@ -543,22 +578,20 @@ function setupEventListeners() {
 }
 
 async function loadAndDisplayData(estado, cidade) {
-    // 🔧 PROTEÇÃO: Validação dos parâmetros
     if (!estado || !cidade) {
         console.warn('Estado ou cidade não informados');
         return;
     }
     
     try {
+        console.log(`Carregando dados para: ${cidade}/${estado}`);
         const units = await fetchHealthUnits(estado, cidade);
         currentData = units;
         
-        // 🔧 CORREÇÃO: Limpa recursos antes de renderizar novos
         clearMapMarkers();
         renderCards(units);
         
         if (units && units.length > 0) {
-            // Pequeno delay para garantir que o DOM foi atualizado
             setTimeout(() => {
                 addMarkersToMap(units);
             }, 50);
@@ -654,10 +687,12 @@ if (typeof window !== 'undefined') {
         },
         getCacheSize: () => requestCache.size,
         getMarkers: () => markers.length,
+        getCards: () => currentCards.length,
         forceGC: () => {
             clearMapMarkers();
             if (window.gc) window.gc();
             console.log('Forçando coleta de lixo');
-        }
+        },
+        focusMarker: (index) => focusOnMarker(index) // 🔧 Função de debug
     };
 }
