@@ -11,6 +11,14 @@ body {
     background: #f5f5f5;
 }
 
+/* 🔧 CORREÇÃO CRÍTICA: Container principal com flex para mostrar o mapa */
+.app-container {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+}
+
 /* Sidebar Styles */
 .sidebar {
     width: 380px;
@@ -20,12 +28,14 @@ body {
     box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1);
     z-index: 10;
     overflow: hidden;
+    flex-shrink: 0; /* 🔧 Impede a sidebar de encolher */
 }
 
 .sidebar-header {
     padding: 24px 20px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
+    flex-shrink: 0; /* 🔧 Header não encolhe */
 }
 
 .sidebar-header h1{
@@ -134,11 +144,38 @@ body {
     font-size: 14px;
 }
 
-/* Cards Container */
+/* Cards Container - Scroll otimizado */
 .cards-container {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 16px;
+    min-height: 0; /* 🔧 CRÍTICO: Permite scroll no flex */
+}
+
+/* 🔧 Melhora a experiência de scroll */
+.cards-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.cards-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.cards-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.cards-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Firefox scroll */
+.cards-container {
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
 }
 
 .empty-state {
@@ -195,15 +232,17 @@ body {
     color: #212529;
     font-weight: 600;
     line-height: 1.3;
+    margin: 0;
 }
 
 .card-badge {
     background: #e7f3ff;
     color: #0066cc;
-    padding: 4px 8x;
+    padding: 4px 8px;
     border-radius: 6px;
     font-size: 11px;
     font-weight: 600;
+    white-space: nowrap;
 }
 
 .card-info {
@@ -258,15 +297,17 @@ body {
     background: #218838;
 }
 
-/* Map Container */
+/* Map Container - 🔧 CORREÇÃO: Garante que o mapa ocupe o espaço restante */
 .map-container {
     flex: 1;
     position: relative;
+    min-width: 0; /* 🔧 CRÍTICO: Permite que o flex container encolha corretamente */
 }
 
 .map {
     width: 100%;
     height: 100%;
+    background: #e8e8e8; /* 🔧 Cor de fallback enquanto o mapa carrega */
 }
 
 /* Leaflet Popup Customization */
@@ -294,46 +335,11 @@ body {
     font-size: 11px;
 }
 
-/* Scrollbar */
-.cards-container::-webkit-scrollbar {
-    width: 6px;
+.custom-popup .popup-directions:hover {
+    background: #218838;
 }
 
-.cards-container::-webkit-scrollbar-track {
-    background: #f1f1f1;
-}
-
-.cards-container::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 3px;
-}
-
-.cards-conteiner::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
-
-/* Responsive */
-@media (max-widht: 768px) {
-    .sidebar {
-        width: 100%;
-        position: absolute;
-        height: 50%;
-        bottom: 0;
-        left: 0;
-        box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    .map-container {
-        height: 50%;
-    }
-
-    .app-container {
-        flex-direction: column;
-    }
-}
-
-
-/* Context Message - Princípio de Krug */
+/* Context Message */
 .context-message {
     padding: 20px 20px 0 20px;
 }
@@ -352,6 +358,7 @@ body {
 /* Botão de Gatilho */
 .trigger-container {
     padding: 16px 20px;
+    flex-shrink: 0;
 }
 
 .btn-start {
@@ -393,21 +400,26 @@ body {
 /* Container dos Filtros */
 .filters-container {
     transition: opacity 0.3s ease;
+    flex-shrink: 0;
 }
 
-/* Ajustes no layout */
-.sidebar {
-    width: 380px;
-    background: white;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.1);
-    z-index: 10;
-    overflow: hidden;
-}
-
-/* Correção de responsividade */
+/* Responsivo */
 @media (max-width: 768px) {
+    .app-container {
+        flex-direction: column;
+    }
+    
+    .sidebar {
+        width: 100%;
+        height: 50%;
+        flex-shrink: 0;
+    }
+    
+    .map-container {
+        height: 50%;
+        flex: none;
+    }
+    
     .context-message p {
         font-size: 12px;
         padding: 10px 12px;
@@ -417,4 +429,25 @@ body {
         padding: 12px 16px;
         font-size: 14px;
     }
+    
+    .cards-container {
+        max-height: calc(50vh - 200px);
+    }
+}
+
+/* 🔧 Garantia de que o mapa seja renderizado em qualquer situação */
+.leaflet-container {
+    background: #e8e8e8;
+    z-index: 1;
+}
+
+/* 🔧 Força o mapa a ter altura quando o container pai tem height definida */
+.map-container,
+#map {
+    position: relative;
+}
+
+#map.leaflet-container {
+    height: 100%;
+    width: 100%;
 }
