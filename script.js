@@ -1,6 +1,6 @@
 /**
  * Sistema de Mapeamento de Unidades de Saúde
- * Versão 2.4 - Com OpenStreetMap e validação de coordenadas
+ * Versão 2.5 - Com normalização de coordenadas inválidas
  */
 
 // ==================== CONFIGURAÇÕES ====================
@@ -14,11 +14,13 @@ const CONFIG = {
     DEBOUNCE_DELAY: 300,
     MAX_MARKERS: 1000,
     MAX_CACHE_SIZE: 50,
-    // 🔧 CORREÇÃO: Limites geográficos do Brasil para validar coordenadas
+    // Limites geográficos do Brasil para validar coordenadas
     BRAZIL_LAT_MIN: -33.5,
     BRAZIL_LAT_MAX: 5.5,
     BRAZIL_LNG_MIN: -73.5,
-    BRAZIL_LNG_MAX: -34.5
+    BRAZIL_LNG_MAX: -34.5,
+    // 🔧 NOVO: Threshold para detectar coordenadas incorretas (valores > 1000)
+    COORD_THRESHOLD: 1000
 };
 
 // ==================== ESTADO GLOBAL ====================
@@ -41,7 +43,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         setupEventListeners();
         setupTriggerButton();
         
-        // Garante que o mapa mostre o Brasil corretamente
         setTimeout(() => {
             if (map) {
                 map.setView(CONFIG.BRAZIL_CENTER, CONFIG.BRAZIL_ZOOM);
@@ -129,7 +130,6 @@ async function initMap() {
     try {
         map = L.map('map').setView(CONFIG.BRAZIL_CENTER, CONFIG.BRAZIL_ZOOM);
         
-        // 🔧 SUBSTITUÍDO: OpenStreetMap (sem CORS, mais confiável)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             maxZoom: 19,
@@ -142,6 +142,39 @@ async function initMap() {
         console.error('Erro ao inicializar mapa:', error);
         throw error;
     }
+}
+
+// ==================== FUNÇÃO CRÍTICA: Normaliza coordenadas ====================
+function normalizeCoordinate(value, type = 'lat') {
+    if (value === undefined || value === null || value === '') return NaN;
+    
+    let num = parseFloat(value);
+    if (isNaN(num)) return NaN;
+    
+    // 🔧 CORREÇÃO: Se o valor for absurdo (maior que 1000), provavelmente está com problema
+    if (Math.abs(num) > CONFIG.COORD_THRESHOLD) {
+        console.warn(`Coordenada anômala detectada (${type}=${num}), tentando normalizar...`);
+        
+        // Tenta dividir por 1.000.000.000 (1 bilhão) - erro comum do n8n
+        let normalized = num / 1000000000;
+        if (Math.abs(normalized) < 100) {
+            console.log(`Normalizada para: ${normalized}`);
+            return normalized;
+        }
+        
+        // Tenta dividir por 1.000.000 (1 milhão)
+        normalized = num / 1000000;
+        if (Math.abs(normalized) < 100) {
+            console.log(`Normalizada (1M) para: ${normalized}`);
+            return normalized;
+        }
+        
+        // Se ainda estiver absurdo, retorna NaN
+        console.error(`Não foi possível normalizar coordenada: ${num}`);
+        return NaN;
+    }
+    
+    return num;
 }
 
 // ==================== CARREGAMENTO DE DADOS LOCAIS ====================
@@ -270,22 +303,36 @@ async function fetchHealthUnits(estado, cidade) {
             units = [];
         }
         
-        // 🔧 CORREÇÃO: Valida e corrige coordenadas inválidas
-        units = units.filter(unit => {
-            let lat = parseFloat(unit.latitude || unit.lat || unit.Latitude || unit.LAT);
-            let lng = parseFloat(unit.longitude || unit.lng || unit.Longitude || unit.LON || unit.LNG);
+        // 🔧 CORREÇÃO PRINCIPAL: Normaliza e valida coordenadas
+        const validUnits = [];
+        
+        for (const unit of units) {
+            // Obtém coordenadas originais
+            let rawLat = unit.latitude || unit.lat || unit.Latitude || unit.LAT;
+            let rawLng = unit.longitude || unit.lng || unit.Longitude || unit.LON || unit.LNG;
             
-            // Verifica se a coordenada está dentro do Brasil
+            // Normaliza as coordenadas
+            let lat = normalizeCoordinate(rawLat, 'lat');
+            let lng = normalizeCoordinate(rawLng, 'lng');
+            
+            // Verifica se está dentro do Brasil
             const isValid = !isNaN(lat) && !isNaN(lng) &&
                            lat >= CONFIG.BRAZIL_LAT_MIN && lat <= CONFIG.BRAZIL_LAT_MAX &&
                            lng >= CONFIG.BRAZIL_LNG_MIN && lng <= CONFIG.BRAZIL_LNG_MAX;
             
-            if (!isValid) {
-                console.warn(`Coordenada inválida para ${unit.nome || 'unidade'}: lat=${lat}, lng=${lng}`);
+            if (isValid) {
+                // Cria cópia do objeto com coordenadas normalizadas
+                const normalizedUnit = { ...unit };
+                normalizedUnit.latitude = lat;
+                normalizedUnit.longitude = lng;
+                normalizedUnit.lat = lat;
+                normalizedUnit.lng = lng;
+                validUnits.push(normalizedUnit);
+                console.log(`✅ Coordenada válida para ${unit.nome}: ${lat}, ${lng}`);
+            } else {
+                console.warn(`❌ Coordenada inválida para ${unit.nome || 'unidade'}: lat=${rawLat} (normalizado=${lat}), lng=${rawLng} (normalizado=${lng})`);
             }
-            
-            return isValid;
-        });
+        }
         
         if (requestCache.size >= CONFIG.MAX_CACHE_SIZE) {
             const firstKey = requestCache.keys().next().value;
@@ -293,12 +340,12 @@ async function fetchHealthUnits(estado, cidade) {
         }
         
         requestCache.set(cacheKey, {
-            data: units,
+            data: validUnits,
             timestamp: Date.now()
         });
         
-        console.log(`Carregadas ${units.length} unidades válidas para ${cidade}/${estado}`);
-        return units;
+        console.log(`Carregadas ${validUnits.length} unidades válidas de ${units.length} total para ${cidade}/${estado}`);
+        return validUnits;
     } catch (error) {
         console.error('Erro no fetch:', error);
         showError(`Erro ao carregar unidades: ${error.message}`);
@@ -309,7 +356,7 @@ async function fetchHealthUnits(estado, cidade) {
     }
 }
 
-// ==================== RENDERIZAÇÃO (OTIMIZADA) ====================
+// ==================== RENDERIZAÇÃO ====================
 function clearMapMarkers() {
     if (!map) return;
     
@@ -327,7 +374,6 @@ function clearMapMarkers() {
     if (window.gc) window.gc();
 }
 
-// 🔧 ÍCONE CUSTOMIZADO COLORIDO
 function createCustomIcon(isActive = false) {
     return L.divIcon({
         className: `custom-marker ${isActive ? 'custom-marker-active' : ''}`,
@@ -354,7 +400,6 @@ function addMarkersToMap(units) {
     
     if (!units || units.length === 0) {
         console.warn('Nenhuma unidade com coordenadas válidas para adicionar ao mapa');
-        showError('Nenhuma coordenada válida encontrada para exibir no mapa');
         return;
     }
     
@@ -374,11 +419,8 @@ function addMarkersToMap(units) {
             return;
         }
         
-        // Validação extra antes de adicionar
-        if (isNaN(lat) || isNaN(lng) ||
-            lat < CONFIG.BRAZIL_LAT_MIN || lat > CONFIG.BRAZIL_LAT_MAX ||
-            lng < CONFIG.BRAZIL_LNG_MIN || lng > CONFIG.BRAZIL_LNG_MAX) {
-            console.warn(`Coordenada fora do Brasil para: ${unit.nome || 'unidade'}`, lat, lng);
+        if (isNaN(lat) || isNaN(lng)) {
+            console.warn(`Coordenada inválida para: ${unit.nome || 'unidade'}`);
             return;
         }
         
@@ -423,8 +465,6 @@ function addMarkersToMap(units) {
             console.warn('Erro ao ajustar bounds do mapa:', error);
             map.setView(CONFIG.BRAZIL_CENTER, CONFIG.BRAZIL_ZOOM);
         }
-    } else {
-        console.warn('Nenhum bound válido para ajustar o mapa');
     }
 }
 
@@ -467,7 +507,7 @@ function renderCards(units) {
         emptyDiv.innerHTML = `
             <span class="empty-icon">🏥</span>
             <p>Nenhuma unidade de saúde com coordenadas válidas<br>encontrada nesta cidade</p>
-            <small style="display: block; margin-top: 8px;">⚠️ Verifique se os dados do webhook contêm latitude/longitude corretas</small>
+            <small style="display: block; margin-top: 8px;">⚠️ As coordenadas recebidas estão incorretas. Verifique o backend.</small>
         `;
         fragment.appendChild(emptyDiv);
     } else {
@@ -745,7 +785,7 @@ function debounce(func, wait) {
     };
 }
 
-// ==================== EXPORT (para debug) ====================
+// ==================== EXPORT ====================
 if (typeof window !== 'undefined') {
     window.debugMap = {
         clearCache: () => {
